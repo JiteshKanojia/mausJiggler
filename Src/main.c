@@ -49,13 +49,13 @@
 #define LED_DBG_ON_MS        200  // on-time within each slot
 
 /* Jiggler movement tuning */
-#define JIGGLE_WAIT_MIN_MS   3000
-#define JIGGLE_WAIT_RANGE_MS 5000  // 3-8 s between moves
-#define JIGGLE_STEP_MIN_MS   10
-#define JIGGLE_STEP_RANGE_MS 6     // 10-16 ms between HID updates
-#define JIGGLE_STEPS_MIN     24
-#define JIGGLE_STEPS_RANGE   12    // 24-36 points along the curve
-#define JIGGLE_MAX_DELTA     1     // max pixels per report (1 = smoothest)
+#define JIGGLE_WAIT_MIN_MS      3000
+#define JIGGLE_WAIT_RANGE_MS    5000   // 3-8 s between moves
+#define JIGGLE_STEP_MIN_MS      16
+#define JIGGLE_STEP_RANGE_MS      8    // 16-24 ms between HID updates
+#define JIGGLE_MOVE_MIN_MS       900
+#define JIGGLE_MOVE_RANGE_MS     600   // each move lasts 0.9-1.5 s
+#define JIGGLE_MAX_DELTA           2   // pixels per report
 
 /*
  * USB on STM32F103 needs 72 MHz PLL -> 48 MHz USB clock.
@@ -102,10 +102,10 @@ static float ellipse_b;
 static float rotation;
 static float start_angle;
 static float sweep_angle;
-static int   total_steps;
-static int   current_step;
 static float sent_x, sent_y;
 static uint32_t step_interval_ms;
+static uint32_t move_start_tick;
+static uint32_t move_duration_ms;
 
 static uint8_t hid_report[4] = {0};
 extern USBD_HandleTypeDef hUsbDeviceFS;
@@ -208,7 +208,9 @@ static void led_usb_not_configured(uint32_t now)
 /* ---------- HID send ---------- */
 static uint8_t hid_endpoint_ready(void)
 {
-    if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED)
+    uint8_t state = hUsbDeviceFS.dev_state;
+
+    if (state != USBD_STATE_CONFIGURED && state != USBD_STATE_SUSPENDED)
         return 0;
     if (hUsbDeviceFS.pClassData == NULL)
         return 0;
@@ -262,6 +264,8 @@ static void ellipse_point(float t, float *x, float *y)
 /* ---------- start a new curved move ---------- */
 static void start_new_move(void)
 {
+    uint32_t now = HAL_GetTick();
+
     ellipse_a   = randf(12.0f, 28.0f);
     ellipse_b   = randf(8.0f, 20.0f);
     rotation    = randf(0.0f, 2.0f * M_PI);
@@ -269,46 +273,50 @@ static void start_new_move(void)
     sweep_angle = randf(M_PI * 0.6f, M_PI * 1.6f);
     if (rand() % 2) sweep_angle = -sweep_angle;
 
-    total_steps  = JIGGLE_STEPS_MIN + (rand() % (JIGGLE_STEPS_RANGE + 1));
-    current_step = 0;
     sent_x = 0.0f;
     sent_y = 0.0f;
-
+    move_start_tick = now;
+    move_duration_ms = JIGGLE_MOVE_MIN_MS + (rand() % (JIGGLE_MOVE_RANGE_MS + 1));
     step_interval_ms = JIGGLE_STEP_MIN_MS + (rand() % (JIGGLE_STEP_RANGE_MS + 1));
 
     jiggle_state = JIGGLE_MOVING;
-    last_step_tick = HAL_GetTick();
+    last_step_tick = now;
 }
 
 /* ---------- advance one step of the current move ---------- */
 static void jiggler_step(void)
 {
     uint32_t now = HAL_GetTick();
-    float t, eased, angle, x, y, dx, dy;
+    float move_t, eased, angle, x, y, dx, dy;
     int8_t idx, idy;
+    uint32_t elapsed;
 
     if (now - last_step_tick < step_interval_ms)
         return;
 
-    if (current_step > total_steps)
-    {
-        jiggle_state = JIGGLE_WAITING;
-        next_action_tick = now + (JIGGLE_WAIT_MIN_MS + (rand() % (JIGGLE_WAIT_RANGE_MS + 1)));
-        return;
-    }
+    elapsed = now - move_start_tick;
+    move_t = (float)elapsed / (float)move_duration_ms;
+    if (move_t > 1.0f)
+        move_t = 1.0f;
 
-    t = (float)current_step / (float)total_steps;
-    eased = 0.5f - 0.5f * cosf(t * (float)M_PI);
+    eased = 0.5f - 0.5f * cosf(move_t * (float)M_PI);
     angle = start_angle + sweep_angle * eased;
     ellipse_point(angle, &x, &y);
 
     dx = x - sent_x;
     dy = y - sent_y;
 
-    /* Close enough to this curve point — advance to the next one. */
-    if ((dx * dx + dy * dy) < 0.25f)
+    /* Move complete: duration elapsed and cursor caught up to the path. */
+    if (move_t >= 1.0f && (dx * dx + dy * dy) < 4.0f)
     {
-        current_step++;
+        jiggle_state = JIGGLE_WAITING;
+        next_action_tick = now + (JIGGLE_WAIT_MIN_MS + (rand() % (JIGGLE_WAIT_RANGE_MS + 1)));
+        last_step_tick = now;
+        return;
+    }
+
+    if (fabsf(dx) < 0.01f && fabsf(dy) < 0.01f)
+    {
         last_step_tick = now;
         return;
     }
@@ -316,7 +324,6 @@ static void jiggler_step(void)
     idx = clamp_delta((int)roundf(dx));
     idy = clamp_delta((int)roundf(dy));
 
-    /* Guarantee progress when rounding would otherwise send a zero report. */
     if (idx == 0 && idy == 0)
     {
         if (fabsf(dx) >= fabsf(dy))

@@ -623,7 +623,12 @@ void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
   /* USER CODE BEGIN 6 */
-  if (state == 0)
+  if (state == 1)
+  {
+    /* Release PA12 so the board pull-up can pull D+ high for enumeration. */
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+  }
+  else
   {
     /* Drive D+ low to simulate USB disconnect. */
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -636,7 +641,6 @@ void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
   }
-  /* state == 1: no-op; USB peripheral owns PA12 after init. */
   /* USER CODE END 6 */
 }
 

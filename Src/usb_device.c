@@ -55,9 +55,12 @@ uint8_t USB_IsConfigured(void)
 
 void USB_ForceReconnect(void)
 {
+  (void)USBD_Stop(&hUsbDeviceFS);
   HAL_PCDEx_SetConnectionState(&hpcd_USB_FS, 0);
   HAL_Delay(100);
-  HAL_PCDEx_SetConnectionState(&hpcd_USB_FS, 1);
+  HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+  HAL_Delay(10);
+  (void)USBD_Start(&hUsbDeviceFS);
 }
 /* USER CODE END 0 */
 
@@ -107,7 +110,7 @@ void MX_USB_DEVICE_Init(void)
   }
 
   /* USER CODE BEGIN USB_DEVICE_Init_PostTreatment */
-  USB_ForceReconnect();
+
   /* USER CODE END USB_DEVICE_Init_PostTreatment */
 }
 

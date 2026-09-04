@@ -382,20 +382,25 @@ __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_MOUSE_REPORT_DESC_SIZE]  _
   */
 static uint8_t  USBD_HID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
-  /* Open EP IN */
-  USBD_LL_OpenEP(pdev, HID_EPIN_ADDR, USBD_EP_TYPE_INTR, HID_EPIN_SIZE);
-  pdev->ep_in[HID_EPIN_ADDR & 0xFU].is_used = 1U;
+  UNUSED(cfgidx);
+
+  if (USBD_LL_OpenEP(pdev, HID_EPIN_ADDR, USBD_EP_TYPE_INTR, HID_EPIN_SIZE) != USBD_OK)
+  {
+    return (uint8_t)USBD_FAIL;
+  }
 
   pdev->pClassData = USBD_malloc(sizeof(USBD_HID_HandleTypeDef));
 
   if (pdev->pClassData == NULL)
   {
-    return USBD_FAIL;
+    (void)USBD_LL_CloseEP(pdev, HID_EPIN_ADDR);
+    return (uint8_t)USBD_FAIL;
   }
 
+  pdev->ep_in[HID_EPIN_ADDR & 0xFU].is_used = 1U;
   ((USBD_HID_HandleTypeDef *)pdev->pClassData)->state = HID_IDLE;
 
-  return USBD_OK;
+  return (uint8_t)USBD_OK;
 }
 
 /**

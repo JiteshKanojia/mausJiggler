@@ -593,10 +593,18 @@ void USBD_LL_Delay(uint32_t Delay)
   * @param  size: Size of allocated memory
   * @retval None
   */
+static uint32_t s_hid_alloc_mem[(sizeof(USBD_HID_HandleTypeDef) + 3U) / 4U];
+static uint8_t s_hid_alloc_in_use = 0U;
+
 void *USBD_static_malloc(uint32_t size)
 {
-  static uint32_t mem[(sizeof(USBD_HID_HandleTypeDef)/4)+1];/* On 32-bit boundary */
-  return mem;
+  if ((s_hid_alloc_in_use != 0U) || (size > sizeof(s_hid_alloc_mem)))
+  {
+    return NULL;
+  }
+
+  s_hid_alloc_in_use = 1U;
+  return (void *)s_hid_alloc_mem;
 }
 
 /**
@@ -606,7 +614,8 @@ void *USBD_static_malloc(uint32_t size)
   */
 void USBD_static_free(void *p)
 {
-
+  (void)p;
+  s_hid_alloc_in_use = 0U;
 }
 
 /**

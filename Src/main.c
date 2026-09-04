@@ -463,14 +463,11 @@ void SystemClock_Config(void)
 #endif
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-    {
-      Error_Handler();
-    }
+    Error_Handler();
+  }
+  if (__HAL_RCC_GET_FLAG(RCC_FLAG_HSERDY) == RESET)
+  {
+    Error_Handler();
   }
 #endif
 
@@ -537,10 +534,10 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
   while (1)
   {
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    HAL_Delay(50);
   }
   /* USER CODE END Error_Handler_Debug */
 }

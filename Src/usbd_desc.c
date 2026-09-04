@@ -346,11 +346,14 @@ static void Get_SerialNum(void)
 
   deviceserial0 += deviceserial2;
 
-  if (deviceserial0 != 0)
+  if (deviceserial0 == 0U)
   {
-    IntToUnicode(deviceserial0, &USBD_StringSerial[2], 8);
-    IntToUnicode(deviceserial1, &USBD_StringSerial[18], 4);
+    deviceserial0 = 0x12345678U;
+    deviceserial1 = 0x00000001U;
   }
+
+  IntToUnicode(deviceserial0, &USBD_StringSerial[2], 8);
+  IntToUnicode(deviceserial1, &USBD_StringSerial[18], 4);
 }
 
 /**

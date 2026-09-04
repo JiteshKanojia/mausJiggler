@@ -26,7 +26,7 @@
 #include "usbd_hid.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "stm32f1xx_hal_pcd_ex.h"
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN PV */
@@ -46,7 +46,19 @@ USBD_HandleTypeDef hUsbDeviceFS;
  * -- Insert your variables declaration here --
  */
 /* USER CODE BEGIN 0 */
+extern PCD_HandleTypeDef hpcd_USB_FS;
 
+uint8_t USB_IsConfigured(void)
+{
+  return (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) ? 1U : 0U;
+}
+
+void USB_ForceReconnect(void)
+{
+  HAL_PCDEx_SetConnectionState(&hpcd_USB_FS, 0);
+  HAL_Delay(100);
+  HAL_PCDEx_SetConnectionState(&hpcd_USB_FS, 1);
+}
 /* USER CODE END 0 */
 
 /*
@@ -63,7 +75,21 @@ USBD_HandleTypeDef hUsbDeviceFS;
 void MX_USB_DEVICE_Init(void)
 {
   /* USER CODE BEGIN USB_DEVICE_Init_PreTreatment */
+  /* Blue Pill: F103 has no internal D+ pull-up; force host re-enumeration by
+     pulling PA12 (USB D+) low briefly before the USB peripheral takes over. */
+  {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
 
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+    HAL_Delay(100);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+  }
   /* USER CODE END USB_DEVICE_Init_PreTreatment */
 
   /* Init Device Library, add supported class and start the library. */
@@ -81,7 +107,7 @@ void MX_USB_DEVICE_Init(void)
   }
 
   /* USER CODE BEGIN USB_DEVICE_Init_PostTreatment */
-
+  USB_ForceReconnect();
   /* USER CODE END USB_DEVICE_Init_PostTreatment */
 }
 

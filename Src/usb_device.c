@@ -77,18 +77,20 @@ void USB_ForceReconnect(void)
 void MX_USB_DEVICE_Init(void)
 {
   /* USER CODE BEGIN USB_DEVICE_Init_PreTreatment */
-  /* Force host re-enumeration: pull D+ low, then release to board pull-up (R10). */
+  /* Briefly pull D+ low, then release so R10 can pull it high before USB starts. */
   {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     __HAL_RCC_GPIOA_CLK_ENABLE();
     GPIO_InitStruct.Pin = GPIO_PIN_12;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
     HAL_Delay(50);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+    HAL_Delay(10);
   }
   /* USER CODE END USB_DEVICE_Init_PreTreatment */
 

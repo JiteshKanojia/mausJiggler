@@ -84,6 +84,7 @@ void MX_USB_DEVICE_Init(void);
 void USB_ForceReconnect(void);
 uint8_t USB_IsConfigured(void);
 uint32_t USB_GetResetCount(void);
+uint32_t USB_GetSetupCount(void);
 uint8_t USB_GetDevState(void);
 /* USER CODE END FD */
 /**

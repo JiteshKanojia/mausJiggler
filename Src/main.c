@@ -230,7 +230,8 @@ static void app_poll(void)
 
     if (!USB_IsConfigured())
     {
-        uint32_t period_ms = (USB_GetResetCount() == 0U)
+        /* Setup packets only arrive when the host is actually talking on D+/D-. */
+        uint32_t period_ms = (USB_GetSetupCount() == 0U)
             ? LED_BLINK_NO_HOST_MS
             : LED_BLINK_ENUM_FAIL_MS;
 

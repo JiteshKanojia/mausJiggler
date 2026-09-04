@@ -43,6 +43,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN 0 */
 volatile uint32_t g_usb_reset_count = 0U;
+volatile uint32_t g_usb_setup_count = 0U;
 /* USER CODE END 0 */
 
 /* USER CODE BEGIN PFP */
@@ -115,6 +116,7 @@ static void PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
+  g_usb_setup_count++;
   USBD_LL_SetupStage((USBD_HandleTypeDef*)hpcd->pData, (uint8_t *)hpcd->Setup);
 }
 

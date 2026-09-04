@@ -51,10 +51,11 @@
 /* Jiggler movement tuning */
 #define JIGGLE_WAIT_MIN_MS   3000
 #define JIGGLE_WAIT_RANGE_MS 5000  // 3-8 s between moves
-#define JIGGLE_STEP_MIN_MS   70
-#define JIGGLE_STEP_RANGE_MS 50    // 70-120 ms per step
-#define JIGGLE_STEPS_MIN     8
-#define JIGGLE_STEPS_RANGE   7     // 8-14 steps per move
+#define JIGGLE_STEP_MIN_MS   10
+#define JIGGLE_STEP_RANGE_MS 6     // 10-16 ms between HID updates
+#define JIGGLE_STEPS_MIN     24
+#define JIGGLE_STEPS_RANGE   12    // 24-36 points along the curve
+#define JIGGLE_MAX_DELTA     1     // max pixels per report (1 = smoothest)
 
 /*
  * USB on STM32F103 needs 72 MHz PLL -> 48 MHz USB clock.
@@ -103,7 +104,7 @@ static float start_angle;
 static float sweep_angle;
 static int   total_steps;
 static int   current_step;
-static float prev_x, prev_y;
+static float sent_x, sent_y;
 static uint32_t step_interval_ms;
 
 static uint8_t hid_report[4] = {0};
@@ -240,6 +241,15 @@ static float randf(float min, float max)
     return min + ((float)rand() / (float)RAND_MAX) * (max - min);
 }
 
+static int8_t clamp_delta(int v)
+{
+    if (v > JIGGLE_MAX_DELTA)
+        return (int8_t)JIGGLE_MAX_DELTA;
+    if (v < -JIGGLE_MAX_DELTA)
+        return (int8_t)(-JIGGLE_MAX_DELTA);
+    return (int8_t)v;
+}
+
 /* ---------- ellipse math ---------- */
 static void ellipse_point(float t, float *x, float *y)
 {
@@ -261,8 +271,8 @@ static void start_new_move(void)
 
     total_steps  = JIGGLE_STEPS_MIN + (rand() % (JIGGLE_STEPS_RANGE + 1));
     current_step = 0;
-    prev_x = 0.0f;
-    prev_y = 0.0f;
+    sent_x = 0.0f;
+    sent_y = 0.0f;
 
     step_interval_ms = JIGGLE_STEP_MIN_MS + (rand() % (JIGGLE_STEP_RANGE_MS + 1));
 
@@ -274,44 +284,52 @@ static void start_new_move(void)
 static void jiggler_step(void)
 {
     uint32_t now = HAL_GetTick();
+    float t, eased, angle, x, y, dx, dy;
+    int8_t idx, idy;
 
-    if (now - last_step_tick < step_interval_ms) return;
+    if (now - last_step_tick < step_interval_ms)
+        return;
 
-    if (current_step >= total_steps)
+    if (current_step > total_steps)
     {
         jiggle_state = JIGGLE_WAITING;
         next_action_tick = now + (JIGGLE_WAIT_MIN_MS + (rand() % (JIGGLE_WAIT_RANGE_MS + 1)));
         return;
     }
 
+    t = (float)current_step / (float)total_steps;
+    eased = 0.5f - 0.5f * cosf(t * (float)M_PI);
+    angle = start_angle + sweep_angle * eased;
+    ellipse_point(angle, &x, &y);
+
+    dx = x - sent_x;
+    dy = y - sent_y;
+
+    /* Close enough to this curve point — advance to the next one. */
+    if ((dx * dx + dy * dy) < 0.25f)
     {
-        int next_step = current_step + 1;
-        float t = (float)next_step / (float)total_steps;
-        float eased = 0.5f - 0.5f * cosf(t * M_PI);
-        float angle = start_angle + sweep_angle * eased;
-        float x, y;
-        float dx, dy;
-        int8_t idx, idy;
-
-        ellipse_point(angle, &x, &y);
-
-        dx = x - prev_x;
-        dy = y - prev_y;
-
-        idx = (int8_t)roundf(dx);
-        idy = (int8_t)roundf(dy);
-
-        if (idx != 0 || idy != 0)
-        {
-            if (!send_hid_move(idx, idy))
-                return;
-        }
-
-        current_step = next_step;
-        prev_x += idx;
-        prev_y += idy;
+        current_step++;
+        last_step_tick = now;
+        return;
     }
 
+    idx = clamp_delta((int)roundf(dx));
+    idy = clamp_delta((int)roundf(dy));
+
+    /* Guarantee progress when rounding would otherwise send a zero report. */
+    if (idx == 0 && idy == 0)
+    {
+        if (fabsf(dx) >= fabsf(dy))
+            idx = (dx > 0.0f) ? 1 : -1;
+        else
+            idy = (dy > 0.0f) ? 1 : -1;
+    }
+
+    if (!send_hid_move(idx, idy))
+        return;
+
+    sent_x += (float)idx;
+    sent_y += (float)idy;
     last_step_tick = now;
 }
 

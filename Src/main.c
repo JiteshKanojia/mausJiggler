@@ -55,7 +55,7 @@
  *   BOARD_HSE_MHZ 12  - external crystal marked 12.000 (PLL x6)
  */
 #ifndef USE_HSI_CLOCK
-#define USE_HSI_CLOCK 0
+#define USE_HSI_CLOCK 1
 #endif
 #ifndef BOARD_HSE_MHZ
 #define BOARD_HSE_MHZ 8
@@ -153,13 +153,17 @@ static void led_usb_not_configured(uint32_t now)
     }
 
     uint8_t blinks = USB_GetDevState();
+    if (USB_GetSetConfigCount() > 0U && blinks < 3U)
+    {
+        blinks = 3U;
+    }
     if (blinks < 1U)
     {
         blinks = 1U;
     }
-    if (blinks > 2U)
+    if (blinks > 3U)
     {
-        blinks = 2U;
+        blinks = 3U;
     }
 
     uint32_t elapsed = now - cycle_start;
@@ -441,8 +445,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL18;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 #else
-  /** HSE -> PLL = 72 MHz SYSCLK, USB = 48 MHz */
+  /** HSE -> PLL = 72 MHz SYSCLK, USB = 48 MHz; fall back to HSI if HSE fails */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
@@ -456,11 +464,18 @@ void SystemClock_Config(void)
 #else
 #error "BOARD_HSE_MHZ must be 8 or 12"
 #endif
-#endif
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
-    Error_Handler();
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL18;
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
   }
+#endif
 
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;

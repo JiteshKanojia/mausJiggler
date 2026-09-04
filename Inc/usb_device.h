@@ -85,6 +85,7 @@ void USB_ForceReconnect(void);
 uint8_t USB_IsConfigured(void);
 uint32_t USB_GetResetCount(void);
 uint32_t USB_GetSetupCount(void);
+uint32_t USB_GetSetConfigCount(void);
 uint8_t USB_GetDevState(void);
 /* USER CODE END FD */
 /**

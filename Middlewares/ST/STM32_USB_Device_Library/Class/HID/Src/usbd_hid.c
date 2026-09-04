@@ -441,6 +441,12 @@ static uint8_t  USBD_HID_Setup(USBD_HandleTypeDef *pdev,
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
     case USB_REQ_TYPE_CLASS :
+      if (hhid == NULL)
+      {
+        USBD_CtlError(pdev, req);
+        ret = USBD_FAIL;
+        break;
+      }
       switch (req->bRequest)
       {
         case HID_REQ_SET_PROTOCOL:

@@ -49,6 +49,7 @@ USBD_HandleTypeDef hUsbDeviceFS;
 extern PCD_HandleTypeDef hpcd_USB_FS;
 extern volatile uint32_t g_usb_reset_count;
 extern volatile uint32_t g_usb_setup_count;
+extern volatile uint32_t g_usb_set_config_count;
 
 uint8_t USB_IsConfigured(void)
 {
@@ -63,6 +64,11 @@ uint32_t USB_GetResetCount(void)
 uint32_t USB_GetSetupCount(void)
 {
   return g_usb_setup_count;
+}
+
+uint32_t USB_GetSetConfigCount(void)
+{
+  return g_usb_set_config_count;
 }
 
 uint8_t USB_GetDevState(void)
@@ -112,7 +118,7 @@ void MX_USB_DEVICE_Init(void)
   }
 
   /* USER CODE BEGIN USB_DEVICE_Init_PostTreatment */
-
+  HAL_Delay(50);
   /* USER CODE END USB_DEVICE_Init_PostTreatment */
 }
 

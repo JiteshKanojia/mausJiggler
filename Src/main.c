@@ -24,8 +24,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdlib.h>
 #include <math.h>
+#include "usbd_def.h"
 #include "usbd_hid.h"
-#include "usb_device.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -111,13 +111,33 @@ static void led_off(void)
 }
 
 /* ---------- HID send ---------- */
-static void send_hid_move(int8_t dx, int8_t dy)
+static uint8_t hid_endpoint_ready(void)
 {
+    if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED)
+        return 0;
+    if (hUsbDeviceFS.pClassData == NULL)
+        return 0;
+
+    USBD_HID_HandleTypeDef *hhid = (USBD_HID_HandleTypeDef *)hUsbDeviceFS.pClassData;
+    return (hhid->state == HID_IDLE);
+}
+
+/* Returns 1 if the report was accepted by the USB stack. */
+static uint8_t send_hid_move(int8_t dx, int8_t dy)
+{
+    USBD_HID_HandleTypeDef *hhid;
+
+    if (!hid_endpoint_ready())
+        return 0;
+
     hid_report[0] = 0;
     hid_report[1] = (uint8_t)dx;
     hid_report[2] = (uint8_t)dy;
     hid_report[3] = 0;
     USBD_HID_SendReport(&hUsbDeviceFS, hid_report, 4);
+
+    hhid = (USBD_HID_HandleTypeDef *)hUsbDeviceFS.pClassData;
+    return (hhid != NULL && hhid->state == HID_BUSY);
 }
 
 /* ---------- random helper ---------- */
@@ -138,19 +158,19 @@ static void ellipse_point(float t, float *x, float *y)
 /* ---------- start a new curved move ---------- */
 static void start_new_move(void)
 {
-    ellipse_a   = randf(3.0f, 9.0f);
-    ellipse_b   = randf(2.0f, 6.0f);
+    ellipse_a   = randf(15.0f, 40.0f);
+    ellipse_b   = randf(10.0f, 30.0f);
     rotation    = randf(0.0f, 2.0f * M_PI);
     start_angle = randf(0.0f, 2.0f * M_PI);
     sweep_angle = randf(M_PI * 0.6f, M_PI * 1.6f);
     if (rand() % 2) sweep_angle = -sweep_angle;
 
-    total_steps  = 8 + (rand() % 10);   // 8-17 steps
+    total_steps  = 6 + (rand() % 7);    // 6-12 steps
     current_step = 0;
     prev_x = 0.0f;
     prev_y = 0.0f;
 
-    step_interval_ms = 12 + (rand() % 18); // 12-30 ms
+    step_interval_ms = 15 + (rand() % 11); // 15-25 ms
 
     jiggle_state = JIGGLE_MOVING;
     last_step_tick = HAL_GetTick();
@@ -163,34 +183,40 @@ static void jiggler_step(void)
 
     if (now - last_step_tick < step_interval_ms) return;
 
-    current_step++;
-    if (current_step > total_steps)
+    if (current_step >= total_steps)
     {
         jiggle_state = JIGGLE_WAITING;
         next_action_tick = now + (3000 + (rand() % 5000)); // 3-8s
         return;
     }
 
-    float t = (float)current_step / (float)total_steps;
-    float eased = 0.5f - 0.5f * cosf(t * M_PI);
-
-    float angle = start_angle + sweep_angle * eased;
-    float x, y;
-    ellipse_point(angle, &x, &y);
-
-    float dx = x - prev_x;
-    float dy = y - prev_y;
-
-    int8_t idx = (int8_t)roundf(dx);
-    int8_t idy = (int8_t)roundf(dy);
-
-    if (idx != 0 || idy != 0)
     {
-        send_hid_move(idx, idy);
-    }
+        int next_step = current_step + 1;
+        float t = (float)next_step / (float)total_steps;
+        float eased = 0.5f - 0.5f * cosf(t * M_PI);
+        float angle = start_angle + sweep_angle * eased;
+        float x, y;
+        float dx, dy;
+        int8_t idx, idy;
 
-    prev_x += idx;
-    prev_y += idy;
+        ellipse_point(angle, &x, &y);
+
+        dx = x - prev_x;
+        dy = y - prev_y;
+
+        idx = (int8_t)roundf(dx);
+        idy = (int8_t)roundf(dy);
+
+        if (idx != 0 || idy != 0)
+        {
+            if (!send_hid_move(idx, idy))
+                return;
+        }
+
+        current_step = next_step;
+        prev_x += idx;
+        prev_y += idy;
+    }
 
     last_step_tick = now;
 }
@@ -290,8 +316,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  /* USER CODE BEGIN 2 */
-  //srand(HAL_GetTick() ^ (uint32_t)&hid_report); // seed RNG
+  srand(HAL_GetTick() ^ (uint32_t)&hid_report);
   led_off();
   /* USER CODE END 2 */
 

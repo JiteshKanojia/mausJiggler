@@ -57,9 +57,8 @@ void USB_ForceReconnect(void)
 {
   (void)USBD_Stop(&hUsbDeviceFS);
   HAL_PCDEx_SetConnectionState(&hpcd_USB_FS, 0);
-  HAL_Delay(100);
-  HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
-  HAL_Delay(10);
+  HAL_Delay(50);
+  HAL_PCDEx_SetConnectionState(&hpcd_USB_FS, 1);
   (void)USBD_Start(&hUsbDeviceFS);
 }
 /* USER CODE END 0 */
@@ -78,20 +77,21 @@ void USB_ForceReconnect(void)
 void MX_USB_DEVICE_Init(void)
 {
   /* USER CODE BEGIN USB_DEVICE_Init_PreTreatment */
-  /* Blue Pill: F103 has no internal D+ pull-up; force host re-enumeration by
-     pulling PA12 (USB D+) low briefly before the USB peripheral takes over. */
+  /* F103 has no internal USB pull-up. Many Blue Pills have a missing/wrong R10
+     (should be 1.5k on PA12). Drive D+ high via GPIO before USB takes over. */
   {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     __HAL_RCC_GPIOA_CLK_ENABLE();
     GPIO_InitStruct.Pin = GPIO_PIN_12;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
-    HAL_Delay(100);
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+    HAL_Delay(10);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_SET);
+    HAL_Delay(10);
   }
   /* USER CODE END USB_DEVICE_Init_PreTreatment */
 

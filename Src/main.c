@@ -63,7 +63,6 @@ static uint32_t startup_tick = 0;
 static uint32_t led_last_toggle = 0;
 static uint8_t  led_state = 0;
 static uint8_t  startup_started = 0;
-static uint32_t usb_reconnect_tick = 0;
 
 /* ---- Jiggler state ---- */
 typedef enum { JIGGLE_WAITING, JIGGLE_MOVING } JiggleState;
@@ -235,12 +234,6 @@ static void app_poll(void)
             led_toggle();
             led_last_toggle = now;
         }
-
-        if (now - usb_reconnect_tick >= 2000U)
-        {
-            usb_reconnect_tick = now;
-            USB_ForceReconnect();
-        }
         return;
     }
 
@@ -334,7 +327,6 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  usb_reconnect_tick = HAL_GetTick();
   srand(HAL_GetTick() ^ (uint32_t)&hid_report);
   led_off();
   /* USER CODE END 2 */

@@ -47,10 +47,21 @@ USBD_HandleTypeDef hUsbDeviceFS;
  */
 /* USER CODE BEGIN 0 */
 extern PCD_HandleTypeDef hpcd_USB_FS;
+extern volatile uint32_t g_usb_reset_count;
 
 uint8_t USB_IsConfigured(void)
 {
   return (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) ? 1U : 0U;
+}
+
+uint32_t USB_GetResetCount(void)
+{
+  return g_usb_reset_count;
+}
+
+uint8_t USB_GetDevState(void)
+{
+  return hUsbDeviceFS.dev_state;
 }
 
 void USB_ForceReconnect(void)

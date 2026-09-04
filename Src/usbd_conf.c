@@ -42,7 +42,7 @@ PCD_HandleTypeDef hpcd_USB_FS;
 void Error_Handler(void);
 
 /* USER CODE BEGIN 0 */
-
+volatile uint32_t g_usb_reset_count = 0U;
 /* USER CODE END 0 */
 
 /* USER CODE BEGIN PFP */
@@ -173,6 +173,7 @@ static void PCD_ResetCallback(PCD_HandleTypeDef *hpcd)
 void HAL_PCD_ResetCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
+  g_usb_reset_count++;
   USBD_SpeedTypeDef speed = USBD_SPEED_FULL;
 
   if ( hpcd->Init.speed != PCD_SPEED_FULL)
@@ -626,7 +627,11 @@ void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
   }
-  /* state == 1: do nothing; USB peripheral controls PA12. */
+  else
+  {
+    /* Release PA12 so the 1.5 kOhm D+ pull-up can signal connect to the host. */
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_12);
+  }
   /* USER CODE END 6 */
 }
 

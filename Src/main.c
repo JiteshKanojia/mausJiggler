@@ -41,9 +41,10 @@
 #endif
 
 #define STARTUP_DELAY_MS   3000
-#define LED_BLINK_WAIT_MS  1000   // full period while waiting
+#define LED_BLINK_WAIT_MS  1000   // full period while waiting (USB OK)
 #define LED_BLINK_WORK_MS  500    // full period while moving
-#define LED_BLINK_USB_ERR_MS 150  // fast blink when USB not enumerated
+#define LED_BLINK_NO_HOST_MS 150  // host never pulled USB reset (no electrical USB)
+#define LED_BLINK_ENUM_FAIL_MS 400 // host reset USB but SET_CONFIGURATION never completed
 
 /* USER CODE END PD */
 
@@ -229,7 +230,11 @@ static void app_poll(void)
 
     if (!USB_IsConfigured())
     {
-        if (now - led_last_toggle >= LED_BLINK_USB_ERR_MS / 2)
+        uint32_t period_ms = (USB_GetResetCount() == 0U)
+            ? LED_BLINK_NO_HOST_MS
+            : LED_BLINK_ENUM_FAIL_MS;
+
+        if (now - led_last_toggle >= period_ms / 2U)
         {
             led_toggle();
             led_last_toggle = now;

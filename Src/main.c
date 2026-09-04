@@ -48,6 +48,14 @@
 #define LED_DBG_SLOT_MS      400  // one blink slot within a burst
 #define LED_DBG_ON_MS        200  // on-time within each slot
 
+/* Jiggler movement tuning */
+#define JIGGLE_WAIT_MIN_MS   3000
+#define JIGGLE_WAIT_RANGE_MS 5000  // 3-8 s between moves
+#define JIGGLE_STEP_MIN_MS   70
+#define JIGGLE_STEP_RANGE_MS 50    // 70-120 ms per step
+#define JIGGLE_STEPS_MIN     8
+#define JIGGLE_STEPS_RANGE   7     // 8-14 steps per move
+
 /*
  * USB on STM32F103 needs 72 MHz PLL -> 48 MHz USB clock.
  *   USE_HSI_CLOCK 0  - HSE crystal (recommended; use BOARD_HSE_MHZ)
@@ -244,19 +252,19 @@ static void ellipse_point(float t, float *x, float *y)
 /* ---------- start a new curved move ---------- */
 static void start_new_move(void)
 {
-    ellipse_a   = randf(15.0f, 40.0f);
-    ellipse_b   = randf(10.0f, 30.0f);
+    ellipse_a   = randf(12.0f, 28.0f);
+    ellipse_b   = randf(8.0f, 20.0f);
     rotation    = randf(0.0f, 2.0f * M_PI);
     start_angle = randf(0.0f, 2.0f * M_PI);
     sweep_angle = randf(M_PI * 0.6f, M_PI * 1.6f);
     if (rand() % 2) sweep_angle = -sweep_angle;
 
-    total_steps  = 6 + (rand() % 7);    // 6-12 steps
+    total_steps  = JIGGLE_STEPS_MIN + (rand() % (JIGGLE_STEPS_RANGE + 1));
     current_step = 0;
     prev_x = 0.0f;
     prev_y = 0.0f;
 
-    step_interval_ms = 15 + (rand() % 11); // 15-25 ms
+    step_interval_ms = JIGGLE_STEP_MIN_MS + (rand() % (JIGGLE_STEP_RANGE_MS + 1));
 
     jiggle_state = JIGGLE_MOVING;
     last_step_tick = HAL_GetTick();
@@ -272,7 +280,7 @@ static void jiggler_step(void)
     if (current_step >= total_steps)
     {
         jiggle_state = JIGGLE_WAITING;
-        next_action_tick = now + (3000 + (rand() % 5000)); // 3-8s
+        next_action_tick = now + (JIGGLE_WAIT_MIN_MS + (rand() % (JIGGLE_WAIT_RANGE_MS + 1)));
         return;
     }
 
@@ -337,7 +345,7 @@ static void app_poll(void)
             if (now - startup_tick >= STARTUP_DELAY_MS)
             {
                 app_state = APP_WAITING;
-                next_action_tick = now + (3000 + (rand() % 5000));
+                next_action_tick = now + (JIGGLE_WAIT_MIN_MS + (rand() % (JIGGLE_WAIT_RANGE_MS + 1)));
                 led_last_toggle = now;
             }
             break;

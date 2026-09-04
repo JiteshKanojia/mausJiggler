@@ -49,13 +49,14 @@
 #define LED_DBG_ON_MS        200  // on-time within each slot
 
 /*
- * Clock source for 72 MHz SYSCLK / 48 MHz USB:
- *   USE_HSI_CLOCK 1  - internal oscillator (bypasses crystal; good for testing)
- *   BOARD_HSE_MHZ  8  - external crystal marked 8.000 (PLL x9)
- *   BOARD_HSE_MHZ 12  - external crystal marked 12.000 (PLL x6)
+ * USB on STM32F103 needs 72 MHz PLL -> 48 MHz USB clock.
+ *   USE_HSI_CLOCK 0  - HSE crystal (recommended; use BOARD_HSE_MHZ)
+ *   USE_HSI_CLOCK 1  - HSI only (64 MHz max; USB clock out of spec, test only)
+ *   BOARD_HSE_MHZ  8  - crystal marked 8.000 (PLL x9)
+ *   BOARD_HSE_MHZ 12  - crystal marked 12.000 (PLL x6)
  */
 #ifndef USE_HSI_CLOCK
-#define USE_HSI_CLOCK 1
+#define USE_HSI_CLOCK 0
 #endif
 #ifndef BOARD_HSE_MHZ
 #define BOARD_HSE_MHZ 8
@@ -439,12 +440,12 @@ void SystemClock_Config(void)
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
 #if USE_HSI_CLOCK
-  /** HSI/2 x18 = 72 MHz SYSCLK, USB = 48 MHz (no crystal needed) */
+  /* HSI/2 x16 = 64 MHz (F103 PLL max). USB = 42.7 MHz, not spec-compliant. */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL18;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -469,7 +470,7 @@ void SystemClock_Config(void)
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
     RCC_OscInitStruct.HSIState = RCC_HSI_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL18;
+    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
     {
       Error_Handler();

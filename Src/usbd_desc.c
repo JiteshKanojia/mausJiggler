@@ -62,13 +62,14 @@
   * @{
   */
 
-#define USBD_VID     1155
+/* Generic USB identity (not STM VID/PID or branded mouse names). */
+#define USBD_VID     0x1A2C
 #define USBD_LANGID_STRING     1033
-#define USBD_MANUFACTURER_STRING     "STMicroelectronics"
-#define USBD_PID_FS     22315
-#define USBD_PRODUCT_STRING_FS     "STM32 Human interface"
-#define USBD_CONFIGURATION_STRING_FS     "HID Config"
-#define USBD_INTERFACE_STRING_FS     "HID Interface"
+#define USBD_MANUFACTURER_STRING     "Generic"
+#define USBD_PID_FS     0x0003
+#define USBD_PRODUCT_STRING_FS     "USB Optical Mouse"
+#define USBD_CONFIGURATION_STRING_FS     "Config"
+#define USBD_INTERFACE_STRING_FS     "Mouse"
 
 /* USER CODE BEGIN PRIVATE_DEFINES */
 

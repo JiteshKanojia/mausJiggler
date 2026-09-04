@@ -48,6 +48,19 @@
 #define LED_DBG_SLOT_MS      400  // one blink slot within a burst
 #define LED_DBG_ON_MS        200  // on-time within each slot
 
+/*
+ * Clock source for 72 MHz SYSCLK / 48 MHz USB:
+ *   USE_HSI_CLOCK 1  - internal oscillator (bypasses crystal; good for testing)
+ *   BOARD_HSE_MHZ  8  - external crystal marked 8.000 (PLL x9)
+ *   BOARD_HSE_MHZ 12  - external crystal marked 12.000 (PLL x6)
+ */
+#ifndef USE_HSI_CLOCK
+#define USE_HSI_CLOCK 0
+#endif
+#ifndef BOARD_HSE_MHZ
+#define BOARD_HSE_MHZ 8
+#endif
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -421,14 +434,29 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /** 8 MHz HSE (Blue Pill) -> PLL x9 = 72 MHz SYSCLK, USB = 48 MHz */
+#if USE_HSI_CLOCK
+  /** HSI/2 x18 = 72 MHz SYSCLK, USB = 48 MHz (no crystal needed) */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL18;
+#else
+  /** HSE -> PLL = 72 MHz SYSCLK, USB = 48 MHz */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+#if BOARD_HSE_MHZ == 12
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
+#elif BOARD_HSE_MHZ == 8
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+#else
+#error "BOARD_HSE_MHZ must be 8 or 12"
+#endif
+#endif
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();

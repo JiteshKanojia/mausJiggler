@@ -43,8 +43,10 @@
 #define STARTUP_DELAY_MS   3000
 #define LED_BLINK_WAIT_MS  1000   // full period while waiting (USB OK)
 #define LED_BLINK_WORK_MS  500    // full period while moving
-#define LED_BLINK_NO_HOST_MS 150  // host never pulled USB reset (no electrical USB)
-#define LED_BLINK_ENUM_FAIL_MS 400 // host reset USB but SET_CONFIGURATION never completed
+#define LED_BLINK_NO_HOST_MS 150  // continuous fast blink: no host setup packets
+#define LED_DBG_CYCLE_MS     2500 // pause between burst groups
+#define LED_DBG_SLOT_MS      400  // one blink slot within a burst
+#define LED_DBG_ON_MS        200  // on-time within each slot
 
 /* USER CODE END PD */
 
@@ -110,6 +112,74 @@ static void led_toggle(void)
 static void led_off(void)
 {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+    led_state = 0;
+}
+
+/* Not configured: fast blink = no setup packets; N blinks/cycle = dev_state (1 or 2). */
+static void led_usb_not_configured(uint32_t now)
+{
+    static uint32_t cycle_start = 0U;
+    static uint8_t cycle_started = 0U;
+
+    if (USB_GetSetupCount() == 0U)
+    {
+        cycle_started = 0U;
+        if (now - led_last_toggle >= LED_BLINK_NO_HOST_MS / 2U)
+        {
+            led_toggle();
+            led_last_toggle = now;
+        }
+        return;
+    }
+
+    if (!cycle_started)
+    {
+        cycle_start = now;
+        cycle_started = 1U;
+        led_off();
+    }
+
+    uint8_t blinks = USB_GetDevState();
+    if (blinks < 1U)
+    {
+        blinks = 1U;
+    }
+    if (blinks > 2U)
+    {
+        blinks = 2U;
+    }
+
+    uint32_t elapsed = now - cycle_start;
+    if (elapsed >= LED_DBG_CYCLE_MS)
+    {
+        cycle_start = now;
+        elapsed = 0U;
+        led_off();
+    }
+
+    uint32_t slot = elapsed / LED_DBG_SLOT_MS;
+    uint32_t in_slot = elapsed % LED_DBG_SLOT_MS;
+
+    if (slot < blinks)
+    {
+        uint8_t on = (in_slot < LED_DBG_ON_MS) ? 1U : 0U;
+        if (on != led_state)
+        {
+            if (on)
+            {
+                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+            }
+            else
+            {
+                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+            }
+            led_state = on;
+        }
+    }
+    else
+    {
+        led_off();
+    }
 }
 
 /* ---------- HID send ---------- */
@@ -230,16 +300,7 @@ static void app_poll(void)
 
     if (!USB_IsConfigured())
     {
-        /* Setup packets only arrive when the host is actually talking on D+/D-. */
-        uint32_t period_ms = (USB_GetSetupCount() == 0U)
-            ? LED_BLINK_NO_HOST_MS
-            : LED_BLINK_ENUM_FAIL_MS;
-
-        if (now - led_last_toggle >= period_ms / 2U)
-        {
-            led_toggle();
-            led_last_toggle = now;
-        }
+        led_usb_not_configured(now);
         return;
     }
 

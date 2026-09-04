@@ -154,17 +154,13 @@ static void led_usb_not_configured(uint32_t now)
     }
 
     uint8_t blinks = USB_GetDevState();
-    if (USB_GetSetConfigCount() > 0U && blinks < 3U)
-    {
-        blinks = 3U;
-    }
     if (blinks < 1U)
     {
         blinks = 1U;
     }
-    if (blinks > 3U)
+    if (blinks > 4U)
     {
-        blinks = 3U;
+        blinks = 4U;
     }
 
     uint32_t elapsed = now - cycle_start;

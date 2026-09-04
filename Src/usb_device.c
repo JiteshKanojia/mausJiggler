@@ -53,7 +53,8 @@ extern volatile uint32_t g_usb_set_config_count;
 
 uint8_t USB_IsConfigured(void)
 {
-  return (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) ? 1U : 0U;
+  return ((hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) ||
+          (hUsbDeviceFS.dev_state == USBD_STATE_SUSPENDED)) ? 1U : 0U;
 }
 
 uint32_t USB_GetResetCount(void)

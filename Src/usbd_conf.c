@@ -45,6 +45,10 @@ void Error_Handler(void);
 volatile uint32_t g_usb_reset_count = 0U;
 volatile uint32_t g_usb_setup_count = 0U;
 volatile uint32_t g_usb_set_config_count = 0U;
+volatile uint32_t g_usb_config_ok_count = 0U;
+
+static uint32_t s_hid_alloc_mem[(sizeof(USBD_HID_HandleTypeDef) + 3U) / 4U];
+static uint8_t s_hid_alloc_in_use = 0U;
 /* USER CODE END 0 */
 
 /* USER CODE BEGIN PFP */
@@ -181,6 +185,7 @@ void HAL_PCD_ResetCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
   g_usb_reset_count++;
+  s_hid_alloc_in_use = 0U;
   USBD_SpeedTypeDef speed = USBD_SPEED_FULL;
 
   if ( hpcd->Init.speed != PCD_SPEED_FULL)
@@ -206,8 +211,15 @@ static void PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
-  /* Inform USB library that core enters in suspend Mode. */
-  USBD_LL_Suspend((USBD_HandleTypeDef*)hpcd->pData);
+  USBD_HandleTypeDef *pdev = (USBD_HandleTypeDef *)hpcd->pData;
+
+  /* Ignore suspend before configuration (spurious suspend confuses enumeration). */
+  if (pdev->dev_state != USBD_STATE_CONFIGURED)
+  {
+    return;
+  }
+
+  USBD_LL_Suspend(pdev);
   /* Enter in STOP mode. */
   /* USER CODE BEGIN 2 */
   if (hpcd->Init.low_power_enable)
@@ -593,16 +605,9 @@ void USBD_LL_Delay(uint32_t Delay)
   * @param  size: Size of allocated memory
   * @retval None
   */
-static uint32_t s_hid_alloc_mem[(sizeof(USBD_HID_HandleTypeDef) + 3U) / 4U];
-static uint8_t s_hid_alloc_in_use = 0U;
-
 void *USBD_static_malloc(uint32_t size)
 {
-  if ((s_hid_alloc_in_use != 0U) || (size > sizeof(s_hid_alloc_mem)))
-  {
-    return NULL;
-  }
-
+  (void)size;
   s_hid_alloc_in_use = 1U;
   return (void *)s_hid_alloc_mem;
 }
